@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <title>朝闻道 - softirq</title>
+        <link rel="stylesheet" type="text/css" href="../../css/default.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../">朝闻道</a>
+            </div>
+            <div id="navigation">
+                <a href="../../">Home</a>
+                <a href="../../archive.html">Archive</a>
+                <a href="../../notes.html">Notes</a>
+                <a href="../../about.html">About</a>
+		<a href="../../atom.xml"><img src="../../images/feed.png" height="20px" /></a>
+            </div>
+        </div>
+
+        <div id="content">
+            <h1>softirq</h1>
+
+            <div class="info">
+    
+</div>
+
+<h1 id="others">Others</h1>
+<p>percpu data on x86: use a segment register to store the offset of each per cpu data</p>
+<h1 id="softirq">Softirq</h1>
+<p>Time when softirq execute:</p>
+<ul>
+<li>In the return from hardware interrupt code path</li>
+<li>In the ksoftirqd kernel thread</li>
+<li>In any code that explicitly checks for and executes pending softirqs, such as the net- working subsystem</li>
+</ul>
+<p>function <code>__do_softirq</code>:</p>
+<ul>
+<li>iterate, check and run softirq handler</li>
+<li>called by
+<ul>
+<li><code>do_softirq_own_stack</code>, which call by <code>do_softirq</code> and <code>invoke_softirq</code></li>
+<li><code>invoke_softirq</code>, when return from hardirq code path</li>
+<li><code>run_ksoftirqd</code>, <code>thread_fn</code> for ksoftirqd</li>
+</ul></li>
+<li>called with local irq disabled, gauranteed by caller</li>
+<li>softirq handlers run with local irq enable, and the same softirq handler can run on other cpus simultaneously</li>
+<li>softirq handlers cannot sleep</li>
+</ul>
+<p>irq that interrupt softirq: does NOT call <code>invoke_softirq</code> to handle new pending softirq.</p>
+<p>Example:</p>
+<ul>
+<li>when a cpu is running happily in a user process, an irq occurs(<code>preempt_count_add(HARDIRQ_OFFSET)</code>) and does some hardware related work then call <code>invoke_softirq</code> to check and run softirqs, at this time, another irq comes(we call this ORIQ), which can happen since interrupt is enabled in <code>__do_softirq</code>. ORIQ will find itself <code>in_interrupt</code> and does not <code>invoke_softirq</code>. See <code>irq_enter</code> and <code>irq_exit</code> in <code>kernel/softirq.c</code> for details.</li>
+<li>besides, even in process contexts, <code>__do_softirq</code> will also disable local bottom halves before softirq <code>action</code> via <code>__local_bh_disable_ip</code>, and enable later via <code>__local_bh_enable_ip</code>, and the {dis|en}able operations are called when local irq disable, so local cpu will always seetheir affect.</li>
+</ul>
+<p>Conclusion: - softirq is NEVER nested, so is tasklet.</p>
+<h1 id="tasklet">Tasklet</h1>
+<p>State of tasklet:</p>
+<ul>
+<li>state of tasklet is represented by bits in <code>state</code> field in <code>tasklet_struct</code></li>
+<li><code>TASKLET_STATE_SCHED</code>: this tasklet is scheduled and can not be put on this or other cpu’s tasklet queue</li>
+<li><code>TASKLET_STATE_RUN</code>: this tasklet is running. Even this tasklet is scheduled on other cpus(remember that tasklet can not be nested), it can’t run</li>
+<li>a tasklet can be both SCHED and RUN(they are on different bits in <code>state</code>), or either and neither.</li>
+<li>details at <code>tasklet_action</code> in <code>kernel/softirq.c</code>.</li>
+</ul>
+<h1 id="work-queue">Work queue</h1>
+<p>Which is totally different now, the kernel thread entry is still <code>worker_thread</code>, but <code>worker</code> and <code>worker_pool</code> is the new strategy. <code>worker_pool</code> is group of workers by cpu. Ref <code>Documentation/workqueue.txt</code></p>
+<h1 id="api">API</h1>
+<h2 id="api-for-softirq">API for softirq</h2>
+<ul>
+<li><code>open_softirq(int nr, void (*action)(struct softirq_action *))</code>, set the handler for softirq <code>nr</code></li>
+<li><code>raise_softirq(unsigned int nr)</code>, issue the <code>nr</code> softirq</li>
+<li><code>raise_softirq_irqoff(unsigned int nr)</code>, issue the <code>nr</code> softirq in a context that interrupt is already disabled</li>
+<li><code>raise_softirq*</code> will wake up <code>ksoftirqd</code> if called in a process context</li>
+</ul>
+<h2 id="api-for-tasklet">API for tasklet</h2>
+<ul>
+<li><code>DECLARE_TASKLET(name, func, data)</code>, declare a tasklet with <code>name</code> and call <code>func</code> with argument <code>data</code> when issued.</li>
+<li><code>DECLARE_TASKLET_DISABLE(name, func, data)</code>, declare a tasklet with <code>name</code> and call <code>func</code> with argument <code>data</code> when issued. Disabled defaultly</li>
+<li><code>tasklet_init(struct tasklet_struct *t, void (*func)(unsigned long), unsigned long data)</code>, dynamic version for tasklet creation.</li>
+<li><code>tasklet_schedule(struct tasklet_struct *t)</code>, issue tasklet <code>t</code></li>
+<li><code>tasklet_disable(struct tasklet_struct *t)</code>, disable tasklet <code>t</code></li>
+<li><code>tasklet_enable(struct tasklet_struct *t)</code>, enable tasklet <code>t</code></li>
+<li><code>tasklet_kill(struct tasklet_struct *t)</code>, wait until <code>t</code> finished and remove it from tasklet schedule queue, only in process contexts</li>
+<li><code>tasklet_kill_immediate(struct tasklet_struct *t, unsigned int cpu)</code>, remove <code>t</code> from schedule queue anyway, be sure that <code>t</code> is not running and <code>cpu</code> is in <code>CPU_DEAD</code> state, no sleep</li>
+</ul>
+<h2 id="api-for-workqueue">API for workqueue</h2>
+<ul>
+<li><code>DECLARE_WORK(n, f)</code>, declare a work with name <code>n</code> and handler <code>f</code></li>
+<li><code>INIT_WORK(_work, _func)</code>, initialize <code>_work</code> with handler <code>_func</code></li>
+<li><code>bool schedule_work(struct work_struct *work)</code>, issue <code>work</code> in system workqueue, false for already in queue</li>
+<li><code>bool schedule_delayed_work(struct delayed_work *dwork, unsigned long delay)</code>, issue <code>work</code> in system workqueue with <code>delay</code> jiffies</li>
+<li><code>flush_scheduled_work()</code>, wait util all works in system workqueue are done</li>
+<li><code>bool cancel_delayed_work(struct delayed_work *dwork)</code>, <a href="need%20to%20know%20kernel%20timer">TODO</a></li>
+<li><code>struct workqueue_struct * create_workqueue(name)</code>, create a workqueue with <code>name</code></li>
+<li><code>bool queue_work(struct workqueue_struct *wq, struct work_struct *work)</code>, issue <code>work</code> in <code>wq</code></li>
+<li><code>bool queue_delayed_work(struct workqueue_struct *wq, struct delayed_work *dwork, unsigned long delay)</code>, like <code>schedule_delayed_work</code></li>
+<li><code>flush_workqueue(struct workqueue_struct *wq)</code>, like <code>flush_scheduled_work</code></li>
+</ul>
+<h2 id="api-for-control">API for control</h2>
+<ul>
+<li><code>local_bh_disable()</code>, disable softirq on current cpu and therefore tasklet by adding <code>preempt_count</code> in <code>SOFTIRQ_DISABLE_OFFSET</code></li>
+<li><code>local_bh_enable()</code>, enable softirq on current cpu and therefore tasklet and if there is a pending one and the local cpu is not <code>in_interrupt</code>, run it</li>
+<li>these control api are nested, and like irq control, they are to prevent deadlock mainly.</li>
+</ul>
+
+
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+    /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+    var disqus_shortname = 'blogfbqname'; // required: replace example with your forum shortname
+
+    /* * * DON'T EDIT BELOW THIS LINE * * */
+    (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+</script>
+
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+        </div>
+
+        <div id="footer">
+            Site proudly generated by
+            <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+    </body>
+</html>

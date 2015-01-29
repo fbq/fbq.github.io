@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <title>朝闻道 - vfs</title>
+        <link rel="stylesheet" type="text/css" href="../../css/default.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../">朝闻道</a>
+            </div>
+            <div id="navigation">
+                <a href="../../">Home</a>
+                <a href="../../archive.html">Archive</a>
+                <a href="../../notes.html">Notes</a>
+                <a href="../../about.html">About</a>
+		<a href="../../atom.xml"><img src="../../images/feed.png" height="20px" /></a>
+            </div>
+        </div>
+
+        <div id="content">
+            <h1>vfs</h1>
+
+            <div class="info">
+    
+</div>
+
+<h1 id="namespace">Namespace</h1>
+<p>In Unix, filesystems are mounted at a specific mount point in a global hierarchy known as a namespace.</p>
+<p>Recently, Linux has made this hierarchy per-process, to give a unique namespace to each process. Because each process inherits its parent’s namespace (unless you specify otherwise), there is seemingly one global namespace.</p>
+<h1 id="vfs-objects">VFS Objects</h1>
+<ul>
+<li>superblock, represents a specific mounted filesystem.</li>
+<li>inode, represents a specific file.</li>
+<li>dentry, represents a directory entry, which is a single component of a path.</li>
+<li>file, represents an open file as associated with a process.</li>
+<li>operations, contained within each of these primary objects. These objects describe the methods that the kernel invokes against the primary objects</li>
+</ul>
+<h2 id="superblock-object"><em>superblock</em> object</h2>
+<p>All functions in <code>super_operations</code> are invoked by the VFS, in process context. All except <code>dirty_inode()</code> may all block if needed.</p>
+<h2 id="inode-object"><em>inode</em> object</h2>
+<p>An inode represents each file on a filesystem, but the inode object is constructed in memory only as files are accessed.</p>
+<h2 id="dentry-object"><em>dentry</em> object</h2>
+<p>Dentry objects are all components in a path, including files, and don’t correspond to any sort of on-disk data structure.</p>
+<h3 id="dentry-state">dentry state</h3>
+<table>
+<thead>
+<tr class="header">
+<th align="left">status</th>
+<th align="left">condition</th>
+<th align="left">meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">used</td>
+<td align="left"><code>d_inode</code> != NULL &amp;&amp; <code>d_count</code> &gt; 0</td>
+<td align="left">the dentry is used by someone now, can’t be freed</td>
+</tr>
+<tr class="even">
+<td align="left">unused</td>
+<td align="left"><code>d_inode</code> != NULL &amp;&amp; <code>d_count</code> == 0</td>
+<td align="left">the dentry is vaild and nobody use it, can be freed</td>
+</tr>
+<tr class="odd">
+<td align="left">negative</td>
+<td align="left"><code>d_inode</code> == NULL</td>
+<td align="left">act as a cache to indicate the dentry is invalid now, can be freed</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dentry-cache">dentry cache</h3>
+<p>The dentry cache consists of three parts: 1. Lists of “used” dentries linked off their associated inode via the <code>i_dentry</code> field of the inode object. 2. A doubly linked “least recent used” list of unused and negative dentry objects. 3. A hash table and hashing function used to quickly resolve a given path into the associated dentry object.</p>
+<p>The dcache also provides the front end to an inode cache, the icache. Inode objects that are associated with dentry objects are not freed because the dentry maintains a positive usage count over the inode.</p>
+<h2 id="file-object"><em>file</em> object</h2>
+<p>The file object is the in-memory representation of an open file. The object is created in response to the <code>open()</code> system call and destroyed in response to the <code>close()</code> system call. The file object merely represents a process’s view of an open file.</p>
+<h1 id="data-structure-associated-with-filesystems">Data Structure Associated with Filesystems</h1>
+<ul>
+<li><code>file_system_type</code> describing the capabilities and behavior of each filesystem.</li>
+<li><code>vfsmount</code> represents a specific instance of a filesystem, i.e., a mount point.</li>
+</ul>
+<h1 id="data-structure-associated-with-a-process">Data Structure Associated with a Process</h1>
+<ul>
+<li><code>files_struct</code>, which is pointed by <code>files</code> in <code>task_struct</code>, contains all per-process information about open files and file descriptors.</li>
+<li><code>fs_struct</code> contains filesystem information(root directory and pwd for example) related to a process and is pointed by the <code>fs</code> field in <code>task_struct</code></li>
+<li><code>mnt_namespace</code>, which is pointed by <code>mnt_namespace</code> field in <code>task_struct</code>, enable an unique view of the mounted filesystems on the system.</li>
+</ul>
+
+
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+    /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+    var disqus_shortname = 'blogfbqname'; // required: replace example with your forum shortname
+
+    /* * * DON'T EDIT BELOW THIS LINE * * */
+    (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+</script>
+
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+        </div>
+
+        <div id="footer">
+            Site proudly generated by
+            <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+    </body>
+</html>

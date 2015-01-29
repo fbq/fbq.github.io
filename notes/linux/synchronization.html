@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <title>朝闻道 - synchronization</title>
+        <link rel="stylesheet" type="text/css" href="../../css/default.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../">朝闻道</a>
+            </div>
+            <div id="navigation">
+                <a href="../../">Home</a>
+                <a href="../../archive.html">Archive</a>
+                <a href="../../notes.html">Notes</a>
+                <a href="../../about.html">About</a>
+		<a href="../../atom.xml"><img src="../../images/feed.png" height="20px" /></a>
+            </div>
+        </div>
+
+        <div id="content">
+            <h1>synchronization</h1>
+
+            <div class="info">
+    
+</div>
+
+<h1 id="causes-of-concurrency-in-userland">Causes of Concurrency in Userland</h1>
+<ul>
+<li>pseudo-concurreny: two things do not actually happen at the same time but interleave with each other</li>
+<li>true concurreny: two processes are executed in a critical region at the exact same time.</li>
+</ul>
+<h1 id="causes-of-concurrency-in-kernel">Causes of Concurrency in Kernel</h1>
+<ul>
+<li>Interrupts</li>
+<li>Softirq and tasklets</li>
+<li>Kernel preemption</li>
+<li>Sleeping and synchronization with user-space</li>
+<li>Symmetrical multiprocessing</li>
+</ul>
+<h1 id="xxx-safe">xxx-safe</h1>
+<ul>
+<li>interrupt-safe: Code that is safe from concurrent access from an interrupt handler</li>
+<li>SMP-safe: Code that is safe from concurrency on symmetrical multiprocessing machines</li>
+<li>preempt-safe: Code that is safe from concurrency with kernel preemption</li>
+</ul>
+<h1 id="whenever-you-write-kernel-code-you-should-ask-yourself-these-questions">Whenever you write kernel code, you should ask yourself these questions:</h1>
+<ul>
+<li>Is the data global? Can a thread of execution other than the current one access it?</li>
+<li>Is the data shared between process context and interrupt context? Is it shared between two different interrupt handlers?</li>
+<li>If a process is preempted while accessing this data, can the newly scheduled process access the same data?</li>
+<li>Can the current process sleep (block) on anything? If it does, in what state does that leave any shared data?</li>
+<li>What prevents the data from being freed out from under me?</li>
+<li>What happens if this function is called again on another processor?</li>
+<li>Given the proceeding points, how am I going to ensure that my code is safe from concurrency?</li>
+</ul>
+<h1 id="lock-contention">lock contention</h1>
+<p>The term lock contention, or simply contention, describes a lock currently in use but that another thread is trying to acquire.A lock that is highly contended often has threads waiting to acquire it. High contention can occur because a lock is frequently obtained, held for a long time after it is obtained, or both.</p>
+<h1 id="atomic-operations">Atomic operations</h1>
+<ul>
+<li>Atomic Integer Operations</li>
+<li>Atomic Bitwise Operations ## Atomic Integer Operations</li>
+<li><code>atomic_t</code> as operand</li>
+</ul>
+<p><code>typedef struct {       int counter;    } atomic_t;</code></p>
+<ul>
+<li>type checking for atomic operation functions</li>
+<li>prevent compiler’s optimization, such as, alias</li>
+<li>hide architecture-specific details for implementation</li>
+<li><code>atomic_t</code> has 32 bits</li>
+<li>on most architecture, word-size read is always atomic</li>
+</ul>
+<table>
+<thead>
+<tr class="header">
+<th align="left">Atomic Integer Operation</th>
+<th align="left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left"><code>ATOMIC_INIT(int i)</code></td>
+<td align="left">At declaration, initialize to i.</td>
+</tr>
+<tr class="even">
+<td align="left"><code>int atomic_read(atomic_t *v)</code></td>
+<td align="left">Atomically read the integer value of v.</td>
+</tr>
+<tr class="odd">
+<td align="left"><code>void atomic_set(atomic_t *v, int i)</code></td>
+<td align="left">Atomically set v equal to i.</td>
+</tr>
+<tr class="even">
+<td align="left"><code>void atomic_add(int i, atomic_t *v)</code></td>
+<td align="left">Atomically add i to v.</td>
+</tr>
+<tr class="odd">
+<td align="left"><code>void atomic_sub(int i, atomic_t *v)</code></td>
+<td align="left">Atomically subtract i from v.</td>
+</tr>
+<tr class="even">
+<td align="left"><code>void atomic_inc(atomic_t *v)</code></td>
+<td align="left">Atomically add one to v.</td>
+</tr>
+<tr class="odd">
+<td align="left"><code>void atomic_dec(atomic_t *v)</code></td>
+<td align="left">Atomically subtract one from v.</td>
+</tr>
+<tr class="even">
+<td align="left"><code>int atomic_sub_and_test(int i, atomic_t *v)</code></td>
+<td align="left">Atomically subtract i from v and return true if the result is zero; otherwise false.</td>
+</tr>
+<tr class="odd">
+<td align="left"><code>int atomic_add_negative(int i, atomic_t *v)</code></td>
+<td align="left">Atomically add i to v and return true if the result is negative; otherwise false.</td>
+</tr>
+<tr class="even">
+<td align="left"><code>int atomic_add_return(int i, atomic_t *v)</code></td>
+<td align="left">Atomically add i to v and return the result.</td>
+</tr>
+<tr class="odd">
+<td align="left"><code>int atomic_sub_return(int i, atomic_t *v)</code></td>
+<td align="left">Atomically subtract i from v and return the result.</td>
+</tr>
+<tr class="even">
+<td align="left"><code>int atomic_inc_return(int i, atomic_t *v)</code></td>
+<td align="left">Atomically increment v by one and return the result.</td>
+</tr>
+<tr class="odd">
+<td align="left"><code>int atomic_dec_return(int i, atomic_t *v)</code></td>
+<td align="left">Atomically decrement v by one and return the result.</td>
+</tr>
+<tr class="even">
+<td align="left"><code>int atomic_dec_and_test(atomic_t *v)</code></td>
+<td align="left">Atomically decrement v by one and return true if zero; false otherwise.</td>
+</tr>
+<tr class="odd">
+<td align="left"><code>int atomic_inc_and_test(atomic_t *v)</code></td>
+<td align="left">Atomically increment v by one and return true if the result is zero; false otherwise.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="atomic-and-ordering">Atomic and Ordering</h2>
+<ul>
+<li>Atomicity ensures that instructions occur without interruption and that they complete either in their entirety or not at all.</li>
+<li>Ordering, on the other hand, ensures that the desired, relative ordering of two or more instructions—even if they are to occur in separate threads of execution or even separate processors—is preserved.</li>
+</ul>
+<h2 id="bit-atomic-operations">64-Bit Atomic Operations</h2>
+<p><code>typedef struct { 	long counter; } atomic64_t;</code></p>
+<p>Same as atomic integer, only operations on 64-bit and return <code>long</code> as its value. All operations have <code>atomic64_</code> prefix.</p>
+<h2 id="atomic-bitwise-operations">Atomic Bitwise Operations</h2>
+<p>All bitwise operations are in <code>&lt;asm/bitops.h&gt;</code></p>
+<p>The bitop functions are defined to work on unsigned longs: - x64 system the bits numbered: + |0…………..63|64…………127|128………..191|192………..255| - ppc64 system the bits numbered: + |63…………..0|127…………64|191………..128|255………..192| - and on ppc32: + |31…..0|63….32|95….64|127…96|159..128|191..160|223..192|255..224|</p>
+<table>
+<thead>
+<tr class="header">
+<th align="left">Atomic Bitwise Operation</th>
+<th align="left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left"><code>void set_bit(int nr, void *addr)</code></td>
+<td align="left">Atomically set the nr -th bit starting from addr.</td>
+</tr>
+<tr class="even">
+<td align="left"><code>void clear_bit(int nr, void *addr)</code></td>
+<td align="left">Atomically clear the nr -th bit starting from addr.</td>
+</tr>
+<tr class="odd">
+<td align="left"><code>void change_bit(int nr, void *addr)</code></td>
+<td align="left">Atomically flip the value of the nr -th bit starting from addr.</td>
+</tr>
+<tr class="even">
+<td align="left"><code>int test_and_set_bit(int nr, void *addr)</code></td>
+<td align="left">Atomically set the nr -th bit starting from addr and return the previous value.</td>
+</tr>
+<tr class="odd">
+<td align="left"><code>int test_and_clear_bit(int nr, void *addr)</code></td>
+<td align="left">Atomically clear the nr -th bit starting from addr and return the previous value.</td>
+</tr>
+<tr class="even">
+<td align="left"><code>int test_and_change_bit(int nr, void *addr)</code></td>
+<td align="left">Atomically flip the nr -th bit starting from addr and return the previous value.</td>
+</tr>
+<tr class="odd">
+<td align="left"><code>int test_bit(int nr, void *addr)</code></td>
+<td align="left">Atomically return the value of the nr - th bit starting from addr.</td>
+</tr>
+</tbody>
+</table>
+<p><code>nr</code> is the bit number, and there are no limitations on the bit number supplied i. e. <code>nr</code> can be greater than word-size on the architecture, but usually we do not use <code>nr</code> greater than word-size.</p>
+<p>Atomic bitwise operations and their nonatomic versions are the only way for platform independent bitmap.</p>
+<h1 id="locks">Locks</h1>
+<h2 id="spin-lock">Spin Lock</h2>
+<ul>
+<li>Spin Lock will disable kernel <em>PREEMPTION</em> before acquire lock, and enable it after release lock.</li>
+<li>If acquiring a lock without preemption disabled, the process holding the lock may lose its cpu to other process acquiring that lock too, and this will cause a unexpected long busy-wait.</li>
+<li>On uniprocessor machine, <code>spin_lock</code> simply disables kernel preemption</li>
+<li><code>spin_lock_irqsave</code> and <code>spin_unlock_irqstore</code> are implemented partially as macros, so the argument acts like passing by reference.</li>
+<li>In <code>spin_ulock_irq*</code>, irq is enabled first, otherwise, <code>preempt_enable</code> may cause reschedule and switch to another process with irq disabled.</li>
+<li><code>CONFIG_DEBUG_SPINLOCK</code> enables a handful of debugging checks in the spin lock code. ### <code>spin_lock</code></li>
+</ul>
+<ol style="list-style-type: decimal">
+<li>disable preemption</li>
+<li>acquire lock (try lock and spin) ### <code>spin_unlock</code></li>
+<li>release lock</li>
+<li>enable preemption ### <code>spin_lock_irq</code></li>
+<li>disable local interrupt</li>
+<li>disable preemption</li>
+<li>acquire lock (try lock and spin) ### <code>spin_unlock_irq</code></li>
+<li>release lock</li>
+<li>enable local interrupt</li>
+<li>enable preemption ### <code>spin_lock_irqsave</code></li>
+<li>disable local interrupt and save the interrupt flag</li>
+<li>disable preemption</li>
+<li>acquire lock (try lock and spin) ### <code>spin_unlock_irqrestore</code></li>
+<li>release lock</li>
+<li>enable local interrupt and restore the interrupt flag</li>
+<li>enable preemption</li>
+</ol>
+
+
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+    /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+    var disqus_shortname = 'blogfbqname'; // required: replace example with your forum shortname
+
+    /* * * DON'T EDIT BELOW THIS LINE * * */
+    (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+</script>
+
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+        </div>
+
+        <div id="footer">
+            Site proudly generated by
+            <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+    </body>
+</html>
