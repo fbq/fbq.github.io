@@ -87,6 +87,15 @@
 <li><code>fs_struct</code> contains filesystem information(root directory and pwd for example) related to a process and is pointed by the <code>fs</code> field in <code>task_struct</code></li>
 <li><code>mnt_namespace</code>, which is pointed by <code>mnt_namespace</code> field in <code>task_struct</code>, enable an unique view of the mounted filesystems on the system.</li>
 </ul>
+<h1 id="more-data-structures">More Data Structures</h1>
+<h2 id="filename"><code>filename</code></h2>
+<pre class="(c)"><code>struct filename {
+   const char           *name
+   const __user char    *uptr
+   struct audit_names   *aname;
+   bool                 separate;
+};</code></pre>
+<p><code>separate</code> field indicates how the memory of <code>filename</code> is allocated, there are two ways, for small <code>filename</code> structure(all <code>filename</code>s are treated as small ones at first), a slab allocator is used, and for large filename, a <code>kalloc</code> is used.</p>
 
 
 <div id="disqus_thread"></div>

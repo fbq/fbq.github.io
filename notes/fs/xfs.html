@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <title>朝闻道 - xfs</title>
+        <link rel="stylesheet" type="text/css" href="../../css/default.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../">朝闻道</a>
+            </div>
+            <div id="navigation">
+                <a href="../../">Home</a>
+                <a href="../../archive.html">Archive</a>
+                <a href="../../notes.html">Notes</a>
+                <a href="../../about.html">About</a>
+		<a href="../../atom.xml"><img src="../../images/feed.png" height="20px" /></a>
+            </div>
+        </div>
+
+        <div id="content">
+            <h1>xfs</h1>
+
+            <div class="info">
+    
+</div>
+
+<h1 id="terminology">Terminology</h1>
+<ul>
+<li>block(the “4KB”) - OS uses as the minimal unit of data stored, defined in the superblock</li>
+<li>sector(the “512B”) - the least units that a device can access once</li>
+</ul>
+<h1 id="common-types">Common Types</h1>
+<table>
+<thead>
+<tr class="header">
+<th align="left">type name</th>
+<th align="left">representation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">xfs_ino_t</td>
+<td align="left">unsigned 64 bit absolute inode number</td>
+</tr>
+<tr class="even">
+<td align="left">xfs_off_t</td>
+<td align="left">signed 64 bit file offset</td>
+</tr>
+<tr class="odd">
+<td align="left">xfs_daddr_t</td>
+<td align="left">signed 64 bit disk address</td>
+</tr>
+<tr class="even">
+<td align="left">xfs_agnubmer_t</td>
+<td align="left">unsigned 32 bit AG number</td>
+</tr>
+<tr class="odd">
+<td align="left">xfs_agblock_t</td>
+<td align="left">unsigned 32 bit AG relative block number</td>
+</tr>
+<tr class="even">
+<td align="left">xfs_extlen_t</td>
+<td align="left">unsigned 32 bit extent length in blocks</td>
+</tr>
+<tr class="odd">
+<td align="left">xfs_extnum_t</td>
+<td align="left">signed 32 bit number of extent in a file</td>
+</tr>
+<tr class="even">
+<td align="left">xfs_dablk_t</td>
+<td align="left">unsigned 32 bit block number of directories and extended attributes</td>
+</tr>
+<tr class="odd">
+<td align="left">xfs_dahash_t</td>
+<td align="left">unsigned 32 bit hash of a directory file name or extended attribute name</td>
+</tr>
+<tr class="even">
+<td align="left">xfs_dfsbno_t</td>
+<td align="left">unsigned 64 bit filesystem block number combining AG number and block offset into the AG</td>
+</tr>
+<tr class="odd">
+<td align="left">xfs_drfsbno_t</td>
+<td align="left">unsigned 64 bit raw filesystem block number</td>
+</tr>
+<tr class="even">
+<td align="left">xfs_drtbno_t</td>
+<td align="left">unsigned 64 bit extent number in the real-time sub-volume</td>
+</tr>
+<tr class="odd">
+<td align="left">xfs_dfiloff_t</td>
+<td align="left">unsigned 64 bit block offset into a file</td>
+</tr>
+<tr class="even">
+<td align="left">xfs_dfilblks_t</td>
+<td align="left">unsigned 64 bit block count for a file</td>
+</tr>
+</tbody>
+</table>
+<h1 id="allocation-group">Allocation Group</h1>
+<p>XFS filesystems are divided into a number of equally sized chunks called Allocation Groups. Each AG can almost be thought of as an individual filesystem that maintains it’s own space usage. Each AG can be up to one terabyte in size (512 bytes * 2^31 ), regardless of the underlying device’s sector size.</p>
+<p>The first AG is the primary AG, and it maintains the global information, i.e. , free space across the filesystem and total inode counts.</p>
+<p>AG Layout:</p>
+<table>
+<thead>
+<tr class="header">
+<th align="left">field</th>
+<th align="left">size</th>
+<th align="left">usage</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">Superblock(SB)</td>
+<td align="left">1 sector</td>
+<td align="left">superblock of all the filesystem, only the SB of the primary AG is valid</td>
+</tr>
+<tr class="even">
+<td align="left">AG free block info(AGF)</td>
+<td align="left">1 sector</td>
+<td align="left">root pointers of two B+ tree for free spaces for data and metadata of the filesystem</td>
+</tr>
+<tr class="odd">
+<td align="left">AG inode B+ tree info</td>
+<td align="left">1 sector</td>
+<td align="left"></td>
+</tr>
+<tr class="even">
+<td align="left">AG internal free list(AGFL)</td>
+<td align="left">1 sector</td>
+<td align="left">a list of block pointers for reserved space for growing AGF B+ trees(not general data of the FS)</td>
+</tr>
+<tr class="odd">
+<td align="left">Root of inode B+tree</td>
+<td align="left">1 block</td>
+</tr>
+<tr class="even">
+<td align="left">Root of free space B+tree(key = block number)</td>
+<td align="left">1 block</td>
+<td align="left"></td>
+</tr>
+<tr class="odd">
+<td align="left">Root of free space B+tree(key = block count)</td>
+<td align="left">1 block</td>
+<td align="left"></td>
+</tr>
+</tbody>
+</table>
+<h2 id="superblocks">Superblocks</h2>
+<p>Each AG starts with a superblock, the first one is the primary superblock that stores aggregate AG information. Secondary ones are used by <code>xfs_repair</code> when the primary one has been corrupted.</p>
+<h2 id="ag-free-space-management">AG Free Space Management</h2>
+<p>XFS tracks free space in an allocation group using two B+ trees: + tracking space by block number + tracking space by size</p>
+<p>All block numbers, indexes and counts are AG relative.</p>
+<p>B+ tree Node layout |type|number|meaning| |—-|——|——-| |<code>xfs_btree_sblock</code>|1|header of node| |<code>xfs_alloc_key_t</code>|<code>xfs_btree_sblock-&gt;bb_numrecs</code>|key in btree| |<code>xfs_alloc_ptr_t</code>|<code>xfs_btree_sblock-&gt;bb_numrecs</code>|block number of child|</p>
+<p>B+ tree Leaf layout |type|number|meaning| |—-|——|——-| |<code>xfs_btree_sblock</code>|1|header of node| |<code>xfs_alloc_rec_t</code>|<code>xfs_btree_sblock-&gt;bb_numrecs</code>|(start block, block count) tuple|</p>
+<h2 id="ag-free-list">AG Free List</h2>
+<p>an array of AG relative block pointers for reserved space for growing the free space B+trees. This space cannot be used for general user data including inodes, data, directories and extended attributes.</p>
+
+
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+    /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+    var disqus_shortname = 'blogfbqname'; // required: replace example with your forum shortname
+
+    /* * * DON'T EDIT BELOW THIS LINE * * */
+    (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+</script>
+
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+        </div>
+
+        <div id="footer">
+            Site proudly generated by
+            <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+    </body>
+</html>
